@@ -1,68 +1,8 @@
-import requests
 import pandas as pd
 import numpy as np
-import os
 
-from env import get_connection
 
 import prepare as prep
-
-
-def scrape_data(url='link'):
-    """ This function is used to pull data from https://swapi.dev/.
-        url - Url for the FIRST page of the data."""
-    response = requests.get(url)  # Gets response from url
-    data = response.json()  # Create json format response
-    df = pd.DataFrame(data['results'])  # Create df from results
-    page = data.copy()  # Create extra page to 'flip' through
-    while page['next'] is None:  # Create a while loop that will continue until last page
-        page = requests.get(page['next']).json()
-        df = pd.concat([df, pd.DataFrame(page['results'])], ignore_index=True)  # Adds new data to the dataframe
-    return df  # Return df
-
-
-def sql_query(db='None', query='None'):
-    """ This is a function to easily and quickly create a SQL query in python.
-       db - String name of database which to access
-       query - SQL query to run."""
-    db_url = get_connection(db)
-    df = pd.read_sql(query, db_url)
-    return df  # Returns df from the query that was input
-
-
-def get_opds(dt=True, ind=True, sor=True):
-    filename = 'opsd_germany_daily.csv'
-    if os.path.isfile(filename):
-        df = pd.read_csv(filename)
-        df = prep.create_index(df, 'date', datetime=dt, index=ind, sort=sor)  # Re-index df with datetime object
-        return df  # Returns local file if there is one
-    else:
-        df = pd.read_csv('https://raw.githubusercontent.com/jenfly/opsd/master/opsd_germany_daily.csv')
-        df.columns = df.columns.str.lower()  # Lower case column names
-        df.columns = df.columns.str.replace('+', '_')  # Replace '+' with '_'
-        df = prep.create_index(df, 'date', datetime=dt, index=ind, sort=sor)  # Re-index df with datetime object
-        df = df.fillna(0)  # Fill nulls with 0
-        df.wind_solar = df.wind + df.solar  # Recreate wind_solar column
-        df.to_csv(filename)  # Save to .csv file
-        return df  # Return df
-
-
-def get_items(dt=True, ind=True, sor=True):
-    filename = 'items.csv'
-    if os.path.isfile(filename):
-        df = pd.read_csv(filename)  # Returns local file if there is one
-        df = prep.create_index(df, 'sale_date', datetime=dt, index=ind, sort=sor)  # Re-index df with datetime object
-        return df  # Returns local file if there is one
-    else:
-        query = ''' SELECT sale_date, sale_amount, item_brand, item_name, item_price, 
-                    store_address, store_zipcode, store_city, store_state  
-                    FROM sales AS s
-                    LEFT JOIN items as i USING(item_id)
-                    LEFT JOIN stores as st USING(store_id)'''
-        df = sql_query('tsa_item_demand', query)
-        df = prep.create_index(df, 'sale_date', datetime=dt, index=ind, sort=sor)  # Re-index df with datetime object
-        df.to_csv(filename)  # Save to .csv file
-        return df  # Return df
 
 
 def animals():
@@ -92,7 +32,7 @@ def animals():
     age = a.days + a.weeks + a.months + a.years
     a['age'] = age
     a.age = np.where(a.age > 730, 1095, a.age)
-    a.age = np.where(a.age < 30, 1095, a.age)
+    a.age = np.where(a.age < 30, 28, a.age)
 
     # Determine sex and if animal is neutered or spayed
     a.sex_upon_outcome = a.sex_upon_outcome.fillna('Unknown')
@@ -164,6 +104,7 @@ def animals():
             mixed.append(False)
             new_breed.append(row)
     a['new_breed'] = new_breed
+
     breed1 = []
     breed2 = []
     for breed, mix in zip(a.new_breed, mixed):
@@ -197,8 +138,18 @@ def animals():
             bre1.append(breed)
     a.breed1 = bre1
 
+    # Filter the colors
+    colors = []
+    top_colors = a.color.value_counts().head(20).index
+    for color in a.color:
+        if color in top_colors:
+            colors.append(color)
+        else:
+            colors.append('Other')
+    a.color = colors
+
     # Drop the rest of useless columns
-    a = a.drop(columns=['days', 'weeks', 'months', 'years', 'age_upon_outcome', 'datetime', 'animal_id',
+    a = a.drop(columns=['color', 'days', 'weeks', 'months', 'years', 'age_upon_outcome', 'datetime', 'animal_id',
                         'date_of_birth', 'monthyear', 'breed', 'new_breed', 'sex_upon_outcome', 'outcome_subtype'])
 
     return a

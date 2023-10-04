@@ -91,6 +91,27 @@ def baseline(data, method='both'):
         return df  # Returns dataframe with the baseline models
 
 
+def baseline_classification(dataframe, data='', target_value='', show_results=True):
+    results = pd.DataFrame(dataframe[data])
+    results['baseline'] = dataframe[data].mode()[0]
+    df = dataframe.copy()
+    df['baseline'] = df[data].mode()[0]  # Creates a baseline prediction from the mode of the data
+    b_acc = (df[data] == df['baseline']).mean()
+    sub_rec = df[df[data] == target_value]  # Subset of all positive cases for recall
+    b_rec = (sub_rec[data] == sub_rec['baseline']).mean()
+    sub_bas_pre = df[df['baseline'] == target_value]
+    if sub_bas_pre.empty:
+        bas_pre = 0.0
+    else:
+        bas_pre = (sub_bas_pre[data] == sub_bas_pre['baseline']).mean()
+    if show_results:
+        print(f'Baseline accuracy is: {round(b_acc * 100, 2)}%.')
+        print(f'Baseline recall is: {round(b_rec * 100, 2)}%.')
+        print(f'Baseline precision is: {round(bas_pre * 100, 2)}%.')
+        print()
+    return results
+
+
 def eval_model(actual, model):
     """This function will accept two series of the model and actual data and calculate the metrics for the model."""
     residuals = model - actual  # Calculate residuals
@@ -100,16 +121,16 @@ def eval_model(actual, model):
     return SSE, MSE, RMSE  # Returns the calculated metrics
 
 
-def train_model(model, X_train, y_train, X_val, y_val):
+def train_model(model, X_train, y_train, X_val, y_val, X_test=pd.DataFrame, y_test=pd.DataFrame, test=False):
     """This function accepts a model object, and the x and y train and validate dataframes. It will fit, predict, and
     evaluate the models on train and validate."""
     model.fit(X_train, y_train)  # Fits the model to the train data
-    train_preds = model.predict(X_train)  # Create predictions for train
-    skip, skip2, train_rmse = eval_model(y_train, train_preds)  # Caculate RMSE for model on train
-    val_preds = model.predict(X_val)  # Creates predictions for validate
-    skip3, skip4, val_rmse = eval_model(y_val, val_preds)  # Caculate RMSE for model on validate
-    print(f'The train RMSE is {train_rmse}.')
-    print(f'The validate RMSE is {val_rmse}.')
+    print(model.score(X_train, y_train))
+    print(model.score(X_val, y_val))
+    if test is True:
+        print(model.score(X_test, y_test))
+    # train_preds = model.predict(X_train)  # Create predictions for train
+    # val_preds = model.predict(X_val)  # Creates predictions for validate
 
 
 def train_model_gen2(model, X_train, y_train, X_val, y_val):
